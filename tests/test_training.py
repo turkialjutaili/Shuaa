@@ -6,7 +6,7 @@ import pytest
 import torch
 from torch import nn
 from benchmark.dataset import manifest_hash
-from training.train import CLASSES, DEFAULTS, SolarDataset, class_weights, config_from, load_split, preprocess, train
+from training.train import CLASSES, DEFAULTS, SolarDataset, class_weights, config_from, effective_number_weights, load_split, make_model, preprocess, set_trainable, train
 
 class TinyNet(nn.Module):
     def __init__(self):
@@ -72,6 +72,23 @@ def test_unknown_config_rejected(tmp_path):
     with pytest.raises(ValueError, match="Unknown"):
         config_from(path)
 
+def test_effective_number_weights_favor_rare_classes():
+    samples = [{"label": label} for label in range(12) for _ in range(1 if label == 0 else 10)]
+    weights = effective_number_weights(samples, beta=.9)
+    assert weights.shape == (12,)
+    assert weights[0] > weights[1]
+    assert weights.mean().item() == pytest.approx(1.)
+
+def test_next_models_create_at_224_without_download():
+    convnext = make_model(DEFAULTS | {"model":"convnextv2_tiny.fcmae_ft_in22k_in1k", "pretrained":False})
+    assert convnext.get_classifier().out_features == len(CLASSES)
+    dino = make_model(DEFAULTS | {"model":"vit_small_patch14_dinov2.lvd142m", "model_kwargs":{"img_size":224}, "pretrained":False})
+    assert dino.patch_embed.img_size == (224, 224)
+    assert dino.get_classifier().out_features == len(CLASSES)
+    set_trainable(dino, classifier_only=True)
+    assert all(parameter.requires_grad for parameter in dino.get_classifier().parameters())
+    assert not dino.patch_embed.proj.weight.requires_grad
+
 def test_cpu_training_checkpoint_and_resume(tmp_path):
     torch.set_num_threads(1)
     path = fixture(tmp_path)
@@ -97,11 +114,39 @@ def test_onnx_dynamic_probability_parity(tmp_path, monkeypatch):
     output = tmp_path / "run"
     train(config, tmp_path, path, output, device_name="cpu", model_factory=lambda c: TinyNet())
     monkeypatch.setattr(exporter, "make_model", lambda config, pretrained=False: TinyNet())
-    sha = exporter.export([output / "best.pt"], tmp_path, path, tmp_path / "model.onnx")
+    metadata = dict(id="test-training-export", participant="turki", model_name="TinyNet",
+                    paper_url="https://example.com/paper", code_url="https://github.com/turkialjutaili/Shuaa",
+                    source_commit="a" * 40,
+                    checkpoint_url="https://github.com/turkialjutaili/Shuaa/releases/download/test/model.onnx")
+    sha = exporter.export([output / "best.pt"], tmp_path, path, tmp_path / "model.onnx", metadata)
     assert len(sha) == 64
     parity = json.loads((tmp_path / "model.parity.json").read_text())
     assert parity["status"] == "passed"
     assert parity["tested_batch_sizes"] == [1, 8]
+    submission = json.loads((tmp_path / "model.submission.json").read_text())
+    component = submission["training"]["components"][0]
+    assert component["epochs_completed"] == 2
+    assert component["configured_epochs"] == 2
+    assert component["optimizer"] == "AdamW"
+
+def test_dinov2_real_graph_onnx_smoke(tmp_path):
+    import onnx
+    import onnxruntime as ort
+    from training.export import ProbabilityModel
+    torch.set_num_threads(1)
+    config = DEFAULTS | {"model":"vit_small_patch14_dinov2.lvd142m", "model_kwargs":{"img_size":224}, "pretrained":False}
+    model = ProbabilityModel([make_model(config).eval()]).eval()
+    example = torch.zeros(1, 3, 224, 224)
+    target = tmp_path / "dino.onnx"
+    torch.onnx.export(model, example, str(target), input_names=["images"], output_names=["probabilities"],
+                      dynamic_axes={"images":{0:"batch"}, "probabilities":{0:"batch"}}, opset_version=17, dynamo=False)
+    onnx.checker.check_model(str(target))
+    session = ort.InferenceSession(str(target), providers=["CPUExecutionProvider"])
+    for batch_size in (1, 2):
+        batch = example.repeat(batch_size, 1, 1, 1)
+        actual = session.run(["probabilities"], {"images":batch.numpy()})[0]
+        assert actual.shape == (batch_size, len(CLASSES))
+        np.testing.assert_allclose(actual.sum(1), np.ones(batch_size), atol=1e-5)
 
 def test_interrupted_epoch_boundary_resume_matches_uninterrupted(tmp_path, monkeypatch):
     import training.train as trainer

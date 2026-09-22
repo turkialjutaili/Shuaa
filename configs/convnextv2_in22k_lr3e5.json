@@ -1,0 +1,1 @@
+{"model":"convnextv2_tiny.fcmae_ft_in22k_in1k","weighted_loss":false,"class_weighting":"none","seed":42,"epochs":35,"patience":8,"warmup_epochs":2,"batch_size":32,"accumulation":2,"image_size":224,"lr":0.00003,"weight_decay":0.01,"workers":2,"pretrained":true,"time_budget_hours":1.25}

@@ -129,6 +129,11 @@ class BenchmarkTests(unittest.TestCase):
             changed_preprocess = copy.deepcopy(submission)
             changed_preprocess["preprocess"]["input_size"] = 32
             self.assertIsNone(cached_success(Path(directory), changed_preprocess, "validation", evaluation_id(changed_preprocess, "validation"))[1])
+            changed_key = evaluation_id(changed_preprocess, "validation")
+            guarded = copy.deepcopy(record)
+            guarded["submission_contract"] = {name: value for name, value in submission.items() if name != "training"}
+            (result_dir / f"{changed_key}.json").write_text(json.dumps(guarded))
+            self.assertIsNone(cached_success(Path(directory), changed_preprocess, "validation", changed_key)[1])
             legacy = copy.deepcopy(submission)
             legacy.pop("training")
             enriched = enrich_cached_result({"training": submission["training"]}, legacy, "hash", key)

@@ -12,6 +12,8 @@ from training.train import CLASSES, SolarDataset, atomic_json, load_split, make_
 PAPERS = {
     "tf_efficientnetv2_s.in1k": "https://proceedings.mlr.press/v139/tan21a.html",
     "convnextv2_tiny.fcmae_ft_in1k": "https://arxiv.org/abs/2301.00808",
+    "convnextv2_tiny.fcmae_ft_in22k_in1k": "https://arxiv.org/abs/2301.00808",
+    "vit_small_patch14_dinov2.lvd142m": "https://arxiv.org/abs/2304.07193",
 }
 
 class ProbabilityModel(nn.Module):
@@ -20,6 +22,22 @@ class ProbabilityModel(nn.Module):
         self.models = nn.ModuleList(models)
     def forward(self, images):
         return torch.stack([model(images).softmax(1) for model in self.models]).mean(0)
+
+def training_component(checkpoint, state):
+    config = state["config"]
+    epochs_completed = len(state["history"])
+    result_path = Path(checkpoint).parent / "result.json"
+    if result_path.exists():
+        result = json.loads(result_path.read_text(encoding="utf-8"))
+        if result["config"] != config or result["split_file_sha256"] != state["split_file_sha256"]:
+            raise ValueError("Run result differs from checkpoint")
+        if result["epochs_completed"] < epochs_completed:
+            raise ValueError("Run result predates the best checkpoint")
+        epochs_completed = result["epochs_completed"]
+    weighting = config.get("class_weighting") or ("inverse_frequency" if config.get("weighted_loss") else "none")
+    return dict(run_id=Path(checkpoint).parent.name, model_name=config["model"], seed=config["seed"],
+                epochs_completed=epochs_completed, configured_epochs=config["epochs"], optimizer="AdamW",
+                initial_learning_rate=config["lr"], weighted_loss=weighting != "none")
 
 def export(checkpoints, dataset, split_path, output, metadata=None):
     import onnx
@@ -70,7 +88,9 @@ def export(checkpoints, dataset, split_path, output, metadata=None):
             raise ValueError("source_commit must be a full Git commit hash")
         if not metadata["checkpoint_url"].startswith("https://github.com/turkialjutaili/Shuaa/releases/download/"):
             raise ValueError("Use a Shuaa GitHub Release asset URL")
-        submission = dict(schema_version=1, **metadata, checkpoint_sha256=sha256, split_hash=manifest["split_hash"], preprocess=dict(input_size=size, color_mode="RGB", resize="bilinear", mean=[.485, .456, .406], std=[.229, .224, .225]), classes=CLASSES)
+        components = [training_component(path, state) for path, state in zip(checkpoints, states)]
+        training = dict(ensemble_method="probability_mean" if len(states) > 1 else "single_model", components=components)
+        submission = dict(schema_version=1, **metadata, checkpoint_sha256=sha256, split_hash=manifest["split_hash"], preprocess=dict(input_size=size, color_mode="RGB", resize="bilinear", mean=[.485, .456, .406], std=[.229, .224, .225]), classes=CLASSES, training=training)
         from benchmark.evaluation import validate_submission
         validate_submission(submission, manifest["split_hash"])
         atomic_json(output.with_suffix(".submission.json"), submission)

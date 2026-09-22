@@ -1,6 +1,7 @@
-"""Resumable four-model validation campaign, winner repeat and optional ensemble selection."""
+"""Run the legacy or bounded next validation campaign without touching test data."""
 import argparse
 import json
+import os
 from pathlib import Path
 import time
 import numpy as np
@@ -17,6 +18,16 @@ def choose_ensemble(first, second):
     probabilities = (a["probabilities"] + b["probabilities"]) / 2
     return score(a["labels"], probabilities.argmax(1))
 
+CAMPAIGNS = {
+    "legacy": ["efficientnetv2_ce", "convnextv2_ce", "efficientnetv2_weighted", "convnextv2_weighted"],
+    # Ordered one-change trials. DINO is kept within the same bounded allocation so it cannot be
+    # starved by an open-ended ConvNeXt run.
+    "improvements": [
+        "convnextv2_in22k", "convnextv2_in22k_lr3e5", "convnextv2_in22k_smoothing",
+        "convnextv2_in22k_effective_number", "convnextv2_in22k_mixup", "dinov2_small_frozen",
+    ],
+}
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dataset", required=True)
@@ -25,13 +36,14 @@ def main():
     parser.add_argument("--budget-hours", type=float, default=11)
     parser.add_argument("--config-dir", default="configs")
     parser.add_argument("--device", default=None)
+    parser.add_argument("--campaign", choices=sorted(CAMPAIGNS), default=os.environ.get("SHUAA_CAMPAIGN", "legacy"))
     args = parser.parse_args()
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     if args.budget_hours <= 0:
         raise ValueError("budget-hours must be positive")
     start = time.monotonic()
-    configs = ["efficientnetv2_ce", "convnextv2_ce", "efficientnetv2_weighted", "convnextv2_weighted"]
+    configs = CAMPAIGNS[args.campaign]
     results = {}
     # A session may end at any epoch; --resume reuses each run's checkpoint.
     for name in configs:
@@ -44,8 +56,11 @@ def main():
         else:
             remaining = args.budget_hours * 3600 - (time.monotonic() - start)
             if remaining < config["time_budget_hours"] * 3600 + 300:
+                print(json.dumps(dict(run=name, status="skipped_insufficient_campaign_budget", remaining_seconds=remaining)), flush=True)
                 break
+            print(json.dumps(dict(run=name, status="starting", allocation_hours=config["time_budget_hours"])), flush=True)
             result = train(config, args.dataset, args.split, run, resume=True, device_name=args.device)
+            print(json.dumps(dict(run=name, status=result["status"], epochs_completed=result["epochs_completed"], best_validation=result["best_validation"])), flush=True)
         if result["best_validation"] is not None:
             results[name] = result
     if not results:
@@ -56,7 +71,7 @@ def main():
     repeat = output / repeat_name
     config = results[winner]["config"] | {"seed": 43}
     existing = json.loads((repeat / "result.json").read_text()) if (repeat / "result.json").exists() else None
-    if len(results) == 4:
+    if len(results) == len(configs):
         if existing:
             repeat_result = existing
         elif args.budget_hours * 3600 - (time.monotonic() - start) > config["time_budget_hours"] * 3600 + 300:
@@ -71,7 +86,10 @@ def main():
         ensemble = choose_ensemble(output / ordered[0] / "validation_predictions.npz", output / ordered[1] / "validation_predictions.npz")
         if (ensemble["accuracy"], ensemble["macro_f1"]) > rank(results[ordered[0]]):
             selection = dict(kind="probability_mean", runs=ordered[:2], validation=ensemble)
-    atomic_json(output / "campaign.json", dict(status="complete" if len(results) == 5 else "partial", runs=results, selected=selection, test_evaluated=False))
+    core_complete = all(name in results for name in configs)
+    atomic_json(output / "campaign.json", dict(campaign=args.campaign, status="complete" if core_complete else "partial",
+                core_runs=configs, optional_repeat=repeat_name if repeat_name in results else None,
+                runs=results, selected=selection, test_evaluated=False))
     print(json.dumps(selection, indent=2))
 
 if __name__ == "__main__":

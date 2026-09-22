@@ -23,7 +23,9 @@ MEAN = np.array([.485, .456, .406], dtype=np.float32)[:, None, None]
 STD = np.array([.229, .224, .225], dtype=np.float32)[:, None, None]
 DEFAULTS = dict(model="tf_efficientnetv2_s.in1k", seed=42, epochs=35, patience=8, warmup_epochs=2,
                 batch_size=32, accumulation=2, image_size=224, lr=.0001, weight_decay=.01,
-                weighted_loss=False, workers=2, pretrained=True, time_budget_hours=8)
+                weighted_loss=False, class_weighting=None, effective_number_beta=.9999,
+                label_smoothing=0., mixup_alpha=0., freeze_backbone=False, model_kwargs={},
+                workers=2, pretrained=True, time_budget_hours=8)
 
 def config_from(path):
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -38,6 +40,16 @@ def config_from(path):
         raise ValueError("warmup_epochs must be smaller than epochs")
     if c["time_budget_hours"] <= 0 or c["lr"] <= 0 or c["workers"] < 0:
         raise ValueError("Invalid budget, learning rate or workers")
+    if c["class_weighting"] not in {None, "none", "inverse_frequency", "effective_number"}:
+        raise ValueError("class_weighting must be none, inverse_frequency or effective_number")
+    if not 0 <= c["label_smoothing"] < 1 or c["mixup_alpha"] < 0:
+        raise ValueError("Invalid label smoothing or mixup alpha")
+    if not 0 <= c["effective_number_beta"] < 1:
+        raise ValueError("effective_number_beta must be in [0,1)")
+    if c["weighted_loss"] and c["class_weighting"] not in {None, "inverse_frequency"}:
+        raise ValueError("Legacy weighted_loss conflicts with class_weighting")
+    if not isinstance(c["model_kwargs"], dict):
+        raise ValueError("model_kwargs must be an object")
     return c
 
 def preprocess(image, size=224, augment=False):
@@ -100,6 +112,14 @@ def class_weights(samples):
         raise ValueError("Every class must occur in the training partition")
     return torch.tensor(counts.sum() / (len(CLASSES) * counts), dtype=torch.float32)
 
+def effective_number_weights(samples, beta=.9999):
+    counts = np.bincount([s["label"] for s in samples], minlength=len(CLASSES))
+    if (counts == 0).any():
+        raise ValueError("Every class must occur in the training partition")
+    weights = (1. - beta) / (1. - np.power(beta, counts))
+    weights /= weights.mean()
+    return torch.tensor(weights, dtype=torch.float32)
+
 def score(labels, predictions):
     cm = np.zeros((len(CLASSES), len(CLASSES)), dtype=np.int64)
     np.add.at(cm, (labels, predictions), 1)
@@ -110,7 +130,25 @@ def score(labels, predictions):
 
 def make_model(config, pretrained=None):
     import timm
-    return timm.create_model(config["model"], pretrained=config["pretrained"] if pretrained is None else pretrained, num_classes=len(CLASSES))
+    return timm.create_model(config["model"], pretrained=config["pretrained"] if pretrained is None else pretrained,
+                             num_classes=len(CLASSES), **config.get("model_kwargs", {}))
+
+def set_trainable(model, classifier_only):
+    for parameter in model.parameters():
+        parameter.requires_grad = not classifier_only
+    if classifier_only:
+        model.eval()
+        classifier = model.get_classifier()
+        classifier.train()
+        for parameter in classifier.parameters():
+            parameter.requires_grad = True
+
+def apply_mixup(images, target, alpha):
+    if alpha <= 0:
+        return images, target, target, 1.
+    coefficient = float(np.random.beta(alpha, alpha))
+    order = torch.randperm(images.shape[0], device=images.device)
+    return coefficient * images + (1. - coefficient) * images[order], target, target[order], coefficient
 
 def set_seed(seed):
     random.seed(seed)
@@ -161,11 +199,15 @@ def train(config, dataset, split_path, output, resume=False, device_name=None, m
     model = model_factory(config | {"pretrained": False} if resume and last_path.exists() else config).to(device)
     train_data = SolarDataset(dataset, manifest, "train", config["image_size"])
     valid_data = SolarDataset(dataset, manifest, "validation", config["image_size"])
-    weights = class_weights(train_data.samples)  # Also validates support for unweighted CE.
-    criterion = nn.CrossEntropyLoss(weight=weights.to(device) if config["weighted_loss"] else None)
+    inverse_weights = class_weights(train_data.samples)  # Also validates support for unweighted CE.
+    weighting = config["class_weighting"] or ("inverse_frequency" if config["weighted_loss"] else "none")
+    weights = effective_number_weights(train_data.samples, config["effective_number_beta"]) if weighting == "effective_number" else inverse_weights
+    criterion = nn.CrossEntropyLoss(weight=weights.to(device) if weighting != "none" else None,
+                                    label_smoothing=config["label_smoothing"])
     generator = torch.Generator().manual_seed(config["seed"])
     train_loader = DataLoader(train_data, batch_size=config["batch_size"], shuffle=True, num_workers=config["workers"], generator=generator, worker_init_fn=seed_worker, pin_memory=device.type == "cuda")
     valid_loader = DataLoader(valid_data, batch_size=config["batch_size"], shuffle=False, num_workers=config["workers"])
+    set_trainable(model, config["freeze_backbone"] or config["warmup_epochs"] > 0)
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config["epochs"], eta_min=config["lr"] * .01)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
@@ -196,24 +238,22 @@ def train(config, dataset, split_path, output, resume=False, device_name=None, m
         if bad_epochs >= config["patience"]:
             status = "early_stopped"
             break
-        warmup = epoch < config["warmup_epochs"]
-        for parameter in model.parameters():
-            parameter.requires_grad = not warmup
-        if warmup:
-            model.eval()  # Freeze batch-normalization statistics too.
-            model.get_classifier().train()
-            for parameter in model.get_classifier().parameters():
-                parameter.requires_grad = True
+        classifier_only = config["freeze_backbone"] or epoch < config["warmup_epochs"]
+        set_trainable(model, classifier_only)
+        if classifier_only:
+            pass  # set_trainable also freezes normalization statistics.
         else:
             model.train()
         optimizer.zero_grad(set_to_none=True)
         running_loss, count = 0., 0
         for step, (images, target) in enumerate(train_loader):
             images, target = images.to(device), target.to(device)
+            images, target_a, target_b, mix = apply_mixup(images, target, config["mixup_alpha"])
             window_start = (step // config["accumulation"]) * config["accumulation"]
             window_batches = min(config["accumulation"], len(train_loader) - window_start)
             with torch.autocast(device_type=device.type, enabled=device.type == "cuda"):
-                loss = criterion(model(images), target)
+                logits = model(images)
+                loss = mix * criterion(logits, target_a) + (1. - mix) * criterion(logits, target_b)
             if not torch.isfinite(loss):
                 raise ValueError("Non-finite training loss")
             scaler.scale(loss / window_batches).backward()
@@ -240,7 +280,7 @@ def train(config, dataset, split_path, output, resume=False, device_name=None, m
             save_checkpoint(output / "best.pt", state)
             np.savez_compressed(output / "validation_predictions.npz", probabilities=probabilities, labels=labels, ids=np.array([str(s["id"]) for s in valid_data.samples]))
         atomic_json(output / "history.json", history)
-        print(json.dumps(dict(epoch=epoch, accuracy=metrics["accuracy"], macro_f1=metrics["macro_f1"], improved=improved)), flush=True)
+        print(json.dumps(dict(run=output.name, epoch=epoch + 1, configured_epochs=config["epochs"], accuracy=metrics["accuracy"], macro_f1=metrics["macro_f1"], improved=improved, elapsed_seconds=state["elapsed_seconds"])), flush=True)
     result = dict(status=status, epochs_completed=len(history), best_validation=dict(accuracy=best_key[0], macro_f1=best_key[1]) if history else None, config=config, split_hash=manifest.get("split_hash"), split_file_sha256=manifest["file_sha256"], elapsed_seconds=elapsed_before + time.monotonic() - started, device=str(device), test_evaluated=False)
     atomic_json(output / "result.json", result)
     return result

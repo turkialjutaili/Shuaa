@@ -5,6 +5,7 @@ This command never opens the test split or changes the final-test lock.
 """
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -102,4 +103,8 @@ def main():
 
 
 if __name__ == '__main__':
+    # Kaggle writes Unicode notebook logs using the process default encoding.
+    # Windows legacy code pages cannot represent the Arabic project name.
+    if os.name == 'nt' and not sys.flags.utf8_mode:
+        raise SystemExit(subprocess.call([sys.executable, '-X', 'utf8', *sys.argv]))
     sys.exit(main())

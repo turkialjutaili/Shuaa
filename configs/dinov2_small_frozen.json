@@ -1,0 +1,1 @@
+{"model":"vit_small_patch14_dinov2.lvd142m","model_kwargs":{"img_size":224},"weighted_loss":false,"class_weighting":"none","freeze_backbone":true,"seed":42,"epochs":35,"patience":8,"warmup_epochs":0,"batch_size":64,"accumulation":1,"image_size":224,"lr":0.001,"weight_decay":0.01,"workers":2,"pretrained":true,"time_budget_hours":1.25}

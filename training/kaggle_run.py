@@ -29,7 +29,8 @@ def main():
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     manifest = prepare(repo)
     started = datetime.now(timezone.utc).isoformat()
-    subprocess.run([sys.executable, "-m", "training.campaign", "--dataset", str(repo / "data/infrared"), "--split", str(repo / "benchmark/split.json"), "--output", str(runs), "--budget-hours", os.environ.get("SHUAA_BUDGET_HOURS", "11")], check=True)
+    campaign_name = os.environ.get("SHUAA_CAMPAIGN", "legacy")
+    subprocess.run([sys.executable, "-m", "training.campaign", "--dataset", str(repo / "data/infrared"), "--split", str(repo / "benchmark/split.json"), "--output", str(runs), "--budget-hours", os.environ.get("SHUAA_BUDGET_HOURS", "11"), "--campaign", campaign_name], check=True)
     campaign = json.loads((runs / "campaign.json").read_text())
     if "selected" not in campaign:
         raise RuntimeError("No trained model available for export")
@@ -40,7 +41,7 @@ def main():
     metadata = dict(id=f"turki-{release}", participant="turki", model_name=" + ".join(model_names), paper_url=PAPERS[model_names[0]], code_url=f"https://github.com/turkialjutaili/Shuaa/tree/{commit}", source_commit=commit, checkpoint_url=f"https://github.com/turkialjutaili/Shuaa/releases/download/{release}/model.onnx")
     # Release publication happens separately after this validation-parity gate passes.
     export([runs / name / "best.pt" for name in run_names], repo / "data/infrared", repo / "benchmark/split.json", output / "model.onnx", metadata)
-    provenance = dict(source_commit=commit, dataset=manifest["dataset"], split_hash=manifest["split_hash"], started_at=started, finished_at=datetime.now(timezone.utc).isoformat(), python=platform.python_version(), torch=torch.__version__, cuda=torch.version.cuda, gpu=torch.cuda.get_device_name(0), release_tag=release, campaign_status=campaign["status"], selected=selected, papers=[PAPERS[name] for name in model_names], test_evaluated=False)
+    provenance = dict(source_commit=commit, dataset=manifest["dataset"], split_hash=manifest["split_hash"], started_at=started, finished_at=datetime.now(timezone.utc).isoformat(), python=platform.python_version(), torch=torch.__version__, cuda=torch.version.cuda, gpu=torch.cuda.get_device_name(0), release_tag=release, campaign=campaign_name, campaign_status=campaign["status"], selected=selected, papers=[PAPERS[name] for name in model_names], test_evaluated=False)
     atomic_json(output / "provenance.json", provenance)
     (output / "pip-freeze.txt").write_text(subprocess.check_output([sys.executable, "-m", "pip", "freeze"], text=True), encoding="utf-8")
     table = "\n".join(f"| {name} | {r['epochs_completed']} | {r['status']} | {r['best_validation']['accuracy']:.6f} | {r['best_validation']['macro_f1']:.6f} |" for name, r in campaign["runs"].items())
