@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "checkpoint_sha256": "064563ede350837791e15f7452bf85bb35a94139f359107a55115997775b1aa7",
+  "max_absolute_error": 8.940696716308594e-07,
+  "tested_batch_sizes": [
+    1,
+    8
+  ],
+  "split_hash": "043313273c135d80e4a298717c19253145ec1156eb99dc69441b78dcbd4139f5",
+  "test_evaluated": false
+}
