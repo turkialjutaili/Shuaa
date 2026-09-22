@@ -3,12 +3,19 @@
   "url": "https://www.kaggle.com/code/turki101/shuaa-improvements",
   "version": 1,
   "training_source_commit": "0e5d7475fe369d0079f4412d6910b29854fcf1a9",
-  "status": "running",
+  "status": "complete",
   "observed_running_at": "2026-09-22T13:27:42.225672+00:00",
   "requested_accelerator": "NvidiaTeslaT4",
   "campaign": "improvements",
   "campaign_budget_hours": 11,
   "test_evaluated": false,
   "collect_command": "python -X utf8 scripts/collect_kaggle.py --kernel turki101/shuaa-improvements --output outputs/kaggle-improvements",
-  "publish_command": "python -X utf8 scripts/collect_kaggle.py --kernel turki101/shuaa-improvements --output outputs/kaggle-improvements --publish"
+  "publish_command": "python -X utf8 scripts/collect_kaggle.py --kernel turki101/shuaa-improvements --output outputs/kaggle-improvements --publish",
+  "finished_at": "2026-09-22T20:54:31.985700+00:00",
+  "release_url": "https://github.com/turkialjutaili/Shuaa/releases/tag/training-20260922-205413",
+  "submission_id": "turki-training-20260922-205413",
+  "validation": {
+    "accuracy": 0.8627124291902699,
+    "macro_f1": 0.7573700450173536
+  }
 }
