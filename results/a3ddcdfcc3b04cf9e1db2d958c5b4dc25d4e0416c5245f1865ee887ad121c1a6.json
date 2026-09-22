@@ -1,0 +1,342 @@
+{
+  "id": "turki-training-20260922-205413",
+  "participant": "turki",
+  "model_name": "convnextv2_tiny.fcmae_ft_in22k_in1k + convnextv2_tiny.fcmae_ft_in22k_in1k",
+  "phase": "validation",
+  "evaluated_at": "2026-09-22T21:21:16.899271+00:00",
+  "split_hash": "043313273c135d80e4a298717c19253145ec1156eb99dc69441b78dcbd4139f5",
+  "source_commit": "0e5d7475fe369d0079f4412d6910b29854fcf1a9",
+  "paper_url": "https://arxiv.org/abs/2301.00808",
+  "code_url": "https://github.com/turkialjutaili/Shuaa/tree/0e5d7475fe369d0079f4412d6910b29854fcf1a9",
+  "checkpoint_sha256": "064563ede350837791e15f7452bf85bb35a94139f359107a55115997775b1aa7",
+  "training": {
+    "ensemble_method": "probability_mean",
+    "components": [
+      {
+        "run_id": "convnextv2_in22k_mixup_seed43",
+        "model_name": "convnextv2_tiny.fcmae_ft_in22k_in1k",
+        "seed": 43,
+        "epochs_completed": 31,
+        "configured_epochs": 35,
+        "optimizer": "AdamW",
+        "initial_learning_rate": 0.0001,
+        "weighted_loss": false
+      },
+      {
+        "run_id": "convnextv2_in22k_mixup",
+        "model_name": "convnextv2_tiny.fcmae_ft_in22k_in1k",
+        "seed": 42,
+        "epochs_completed": 31,
+        "configured_epochs": 35,
+        "optimizer": "AdamW",
+        "initial_learning_rate": 0.0001,
+        "weighted_loss": false
+      }
+    ]
+  },
+  "submission_contract": {
+    "schema_version": 1,
+    "id": "turki-training-20260922-205413",
+    "participant": "turki",
+    "model_name": "convnextv2_tiny.fcmae_ft_in22k_in1k + convnextv2_tiny.fcmae_ft_in22k_in1k",
+    "paper_url": "https://arxiv.org/abs/2301.00808",
+    "code_url": "https://github.com/turkialjutaili/Shuaa/tree/0e5d7475fe369d0079f4412d6910b29854fcf1a9",
+    "source_commit": "0e5d7475fe369d0079f4412d6910b29854fcf1a9",
+    "checkpoint_url": "https://github.com/turkialjutaili/Shuaa/releases/download/training-20260922-205413/model.onnx",
+    "checkpoint_sha256": "064563ede350837791e15f7452bf85bb35a94139f359107a55115997775b1aa7",
+    "split_hash": "043313273c135d80e4a298717c19253145ec1156eb99dc69441b78dcbd4139f5",
+    "preprocess": {
+      "input_size": 224,
+      "color_mode": "RGB",
+      "resize": "bilinear",
+      "mean": [
+        0.485,
+        0.456,
+        0.406
+      ],
+      "std": [
+        0.229,
+        0.224,
+        0.225
+      ]
+    },
+    "classes": [
+      "Cell",
+      "Cell-Multi",
+      "Cracking",
+      "Hot-Spot",
+      "Hot-Spot-Multi",
+      "Shadowing",
+      "Diode",
+      "Diode-Multi",
+      "Vegetation",
+      "Soiling",
+      "Offline-Module",
+      "No-Anomaly"
+    ]
+  },
+  "submission_sha256": "8d4043b96969a83de8ef911c25b532f38a3ceaad460715811cca6c42b63af915",
+  "accuracy": 0.8627124291902699,
+  "macro_f1": 0.7573700450173536,
+  "balanced_accuracy": 0.7308726724753654,
+  "per_class": [
+    {
+      "label": "Cell",
+      "precision": 0.7017543859649122,
+      "recall": 0.7092198581560284,
+      "f1": 0.7054673721340388,
+      "support": 282
+    },
+    {
+      "label": "Cell-Multi",
+      "precision": 0.6144578313253012,
+      "recall": 0.5284974093264249,
+      "f1": 0.5682451253481894,
+      "support": 193
+    },
+    {
+      "label": "Cracking",
+      "precision": 0.7941176470588235,
+      "recall": 0.7659574468085106,
+      "f1": 0.779783393501805,
+      "support": 141
+    },
+    {
+      "label": "Hot-Spot",
+      "precision": 0.7777777777777778,
+      "recall": 0.5675675675675675,
+      "f1": 0.65625,
+      "support": 37
+    },
+    {
+      "label": "Hot-Spot-Multi",
+      "precision": 0.6944444444444444,
+      "recall": 0.6756756756756757,
+      "f1": 0.684931506849315,
+      "support": 37
+    },
+    {
+      "label": "Shadowing",
+      "precision": 0.8712121212121212,
+      "recall": 0.7232704402515723,
+      "f1": 0.7903780068728522,
+      "support": 159
+    },
+    {
+      "label": "Diode",
+      "precision": 0.9866071428571429,
+      "recall": 0.9822222222222222,
+      "f1": 0.9844097995545658,
+      "support": 225
+    },
+    {
+      "label": "Diode-Multi",
+      "precision": 0.9230769230769231,
+      "recall": 0.9230769230769231,
+      "f1": 0.9230769230769231,
+      "support": 26
+    },
+    {
+      "label": "Vegetation",
+      "precision": 0.7075812274368231,
+      "recall": 0.7967479674796748,
+      "f1": 0.7495219885277247,
+      "support": 246
+    },
+    {
+      "label": "Soiling",
+      "precision": 0.6190476190476191,
+      "recall": 0.41935483870967744,
+      "f1": 0.5,
+      "support": 31
+    },
+    {
+      "label": "Offline-Module",
+      "precision": 0.9052631578947369,
+      "recall": 0.6935483870967742,
+      "f1": 0.7853881278538812,
+      "support": 124
+    },
+    {
+      "label": "No-Anomaly",
+      "precision": 0.9378172588832487,
+      "recall": 0.9853333333333333,
+      "f1": 0.9609882964889467,
+      "support": 1500
+    }
+  ],
+  "confusion_matrix": [
+    [
+      200,
+      31,
+      2,
+      1,
+      0,
+      1,
+      0,
+      0,
+      37,
+      0,
+      1,
+      9
+    ],
+    [
+      30,
+      102,
+      21,
+      0,
+      0,
+      5,
+      0,
+      0,
+      22,
+      3,
+      0,
+      10
+    ],
+    [
+      4,
+      13,
+      108,
+      0,
+      0,
+      1,
+      0,
+      0,
+      10,
+      2,
+      0,
+      3
+    ],
+    [
+      3,
+      0,
+      0,
+      21,
+      4,
+      0,
+      0,
+      0,
+      1,
+      1,
+      0,
+      7
+    ],
+    [
+      0,
+      2,
+      0,
+      4,
+      25,
+      2,
+      0,
+      0,
+      0,
+      0,
+      2,
+      2
+    ],
+    [
+      7,
+      5,
+      1,
+      1,
+      2,
+      115,
+      0,
+      0,
+      3,
+      0,
+      1,
+      24
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      221,
+      0,
+      0,
+      0,
+      0,
+      4
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      24,
+      0,
+      0,
+      0,
+      1
+    ],
+    [
+      27,
+      8,
+      3,
+      0,
+      0,
+      2,
+      0,
+      0,
+      196,
+      2,
+      1,
+      7
+    ],
+    [
+      5,
+      4,
+      0,
+      0,
+      4,
+      0,
+      1,
+      0,
+      3,
+      13,
+      0,
+      1
+    ],
+    [
+      5,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      2,
+      0,
+      0,
+      86,
+      30
+    ],
+    [
+      4,
+      1,
+      1,
+      0,
+      1,
+      6,
+      0,
+      0,
+      5,
+      0,
+      4,
+      1478
+    ]
+  ],
+  "sample_count": 3001,
+  "predictions_path": "results/predictions/a3ddcdfcc3b04cf9e1db2d958c5b4dc25d4e0416c5245f1865ee887ad121c1a6.json",
+  "status": "success",
+  "evaluation_id": "a3ddcdfcc3b04cf9e1db2d958c5b4dc25d4e0416c5245f1865ee887ad121c1a6"
+}
