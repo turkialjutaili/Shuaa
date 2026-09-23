@@ -3,11 +3,24 @@
   "url": "https://www.kaggle.com/code/turki101/shuaa-dinov2-fine-tuning",
   "version": 1,
   "training_source_commit": "80e8b79713ff66adf27d5281fea71825e4b1363b",
-  "status": "running",
-  "requested_accelerator": "GPU",
+  "status": "complete",
+  "requested_accelerator": "Tesla T4",
   "campaign": "dinov2_finetune",
   "campaign_budget_hours": 2.2,
   "test_evaluated": false,
+  "finished_at": "2026-09-23T03:20:11.479368+00:00",
+  "release_url": "https://github.com/turkialjutaili/Shuaa/releases/tag/training-20260923-032000",
+  "submission_id": "turki-training-20260923-032000",
+  "validation": {
+    "accuracy": 0.8303898700433189,
+    "macro_f1": 0.6980271808239341
+  },
+  "independent_cpu_validation": {
+    "accuracy": 0.8303898700433189,
+    "macro_f1": 0.6980271808239341,
+    "workflow_url": "https://github.com/turkialjutaili/Shuaa/actions/runs/35815795586",
+    "site_url": "https://turkialjutaili.github.io/Shuaa/"
+  },
   "collect_command": "python -X utf8 scripts/collect_kaggle.py --kernel turki101/shuaa-dinov2-fine-tuning --output outputs/kaggle-dinov2",
   "publish_command": "python -X utf8 scripts/collect_kaggle.py --kernel turki101/shuaa-dinov2-fine-tuning --output outputs/kaggle-dinov2 --publish"
 }
