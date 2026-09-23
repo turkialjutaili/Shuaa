@@ -1,0 +1,99 @@
+{
+  "campaign": "dinov2_finetune",
+  "status": "complete",
+  "core_runs": [
+    "dinov2_small_last4"
+  ],
+  "optional_repeat": "dinov2_small_last4_seed43",
+  "runs": {
+    "dinov2_small_last4": {
+      "status": "completed",
+      "epochs_completed": 25,
+      "best_validation": {
+        "accuracy": 0.8303898700433189,
+        "macro_f1": 0.6980271808239341
+      },
+      "config": {
+        "model": "vit_small_patch14_dinov2.lvd142m",
+        "seed": 42,
+        "epochs": 25,
+        "patience": 7,
+        "warmup_epochs": 2,
+        "batch_size": 32,
+        "accumulation": 2,
+        "image_size": 224,
+        "lr": 2e-05,
+        "weight_decay": 0.01,
+        "weighted_loss": false,
+        "class_weighting": "none",
+        "effective_number_beta": 0.9999,
+        "label_smoothing": 0,
+        "mixup_alpha": 0,
+        "freeze_backbone": false,
+        "trainable_last_blocks": 4,
+        "head_lr_multiplier": 10,
+        "model_kwargs": {
+          "img_size": 224
+        },
+        "workers": 2,
+        "pretrained": true,
+        "time_budget_hours": 1.75
+      },
+      "split_hash": "043313273c135d80e4a298717c19253145ec1156eb99dc69441b78dcbd4139f5",
+      "split_file_sha256": "775fbc5e9cfa938706339aa33457a7aff2ece189791dfd39a01b5108d6186df0",
+      "elapsed_seconds": 1270.46544894,
+      "device": "cuda",
+      "test_evaluated": false
+    },
+    "dinov2_small_last4_seed43": {
+      "status": "early_stopped",
+      "epochs_completed": 16,
+      "best_validation": {
+        "accuracy": 0.8233922025991336,
+        "macro_f1": 0.6905808397307145
+      },
+      "config": {
+        "model": "vit_small_patch14_dinov2.lvd142m",
+        "seed": 43,
+        "epochs": 25,
+        "patience": 7,
+        "warmup_epochs": 2,
+        "batch_size": 32,
+        "accumulation": 2,
+        "image_size": 224,
+        "lr": 2e-05,
+        "weight_decay": 0.01,
+        "weighted_loss": false,
+        "class_weighting": "none",
+        "effective_number_beta": 0.9999,
+        "label_smoothing": 0,
+        "mixup_alpha": 0,
+        "freeze_backbone": false,
+        "trainable_last_blocks": 4,
+        "head_lr_multiplier": 10,
+        "model_kwargs": {
+          "img_size": 224
+        },
+        "workers": 2,
+        "pretrained": true,
+        "time_budget_hours": 1.75
+      },
+      "split_hash": "043313273c135d80e4a298717c19253145ec1156eb99dc69441b78dcbd4139f5",
+      "split_file_sha256": "775fbc5e9cfa938706339aa33457a7aff2ece189791dfd39a01b5108d6186df0",
+      "elapsed_seconds": 804.4046672129998,
+      "device": "cuda",
+      "test_evaluated": false
+    }
+  },
+  "selected": {
+    "kind": "single",
+    "runs": [
+      "dinov2_small_last4"
+    ],
+    "validation": {
+      "accuracy": 0.8303898700433189,
+      "macro_f1": 0.6980271808239341
+    }
+  },
+  "test_evaluated": false
+}
