@@ -88,6 +88,11 @@ def test_next_models_create_at_224_without_download():
     set_trainable(dino, classifier_only=True)
     assert all(parameter.requires_grad for parameter in dino.get_classifier().parameters())
     assert not dino.patch_embed.proj.weight.requires_grad
+    set_trainable(dino, classifier_only=False, last_blocks=4)
+    assert all(parameter.requires_grad for parameter in dino.blocks[-1].parameters())
+    assert not any(parameter.requires_grad for parameter in dino.blocks[0].parameters())
+    assert all(parameter.requires_grad for parameter in dino.get_classifier().parameters())
+    assert not dino.patch_embed.proj.weight.requires_grad
 
 def test_cpu_training_checkpoint_and_resume(tmp_path):
     torch.set_num_threads(1)

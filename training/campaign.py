@@ -26,6 +26,7 @@ CAMPAIGNS = {
         "convnextv2_in22k", "convnextv2_in22k_lr3e5", "convnextv2_in22k_smoothing",
         "convnextv2_in22k_effective_number", "convnextv2_in22k_mixup", "dinov2_small_frozen",
     ],
+    "dinov2_finetune": ["dinov2_small_last4"],
 }
 
 def main():

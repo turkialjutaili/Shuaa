@@ -1,0 +1,22 @@
+{
+  "model": "vit_small_patch14_dinov2.lvd142m",
+  "model_kwargs": {"img_size": 224},
+  "seed": 42,
+  "epochs": 25,
+  "patience": 7,
+  "warmup_epochs": 2,
+  "batch_size": 32,
+  "accumulation": 2,
+  "image_size": 224,
+  "lr": 0.00002,
+  "head_lr_multiplier": 10,
+  "weight_decay": 0.01,
+  "class_weighting": "none",
+  "label_smoothing": 0,
+  "mixup_alpha": 0,
+  "freeze_backbone": false,
+  "trainable_last_blocks": 4,
+  "workers": 2,
+  "pretrained": true,
+  "time_budget_hours": 1.75
+}

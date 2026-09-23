@@ -24,7 +24,8 @@ STD = np.array([.229, .224, .225], dtype=np.float32)[:, None, None]
 DEFAULTS = dict(model="tf_efficientnetv2_s.in1k", seed=42, epochs=35, patience=8, warmup_epochs=2,
                 batch_size=32, accumulation=2, image_size=224, lr=.0001, weight_decay=.01,
                 weighted_loss=False, class_weighting=None, effective_number_beta=.9999,
-                label_smoothing=0., mixup_alpha=0., freeze_backbone=False, model_kwargs={},
+                label_smoothing=0., mixup_alpha=0., freeze_backbone=False,
+                trainable_last_blocks=0, head_lr_multiplier=1., model_kwargs={},
                 workers=2, pretrained=True, time_budget_hours=8)
 
 def config_from(path):
@@ -50,6 +51,12 @@ def config_from(path):
         raise ValueError("Legacy weighted_loss conflicts with class_weighting")
     if not isinstance(c["model_kwargs"], dict):
         raise ValueError("model_kwargs must be an object")
+    if not isinstance(c["trainable_last_blocks"], int) or c["trainable_last_blocks"] < 0:
+        raise ValueError("trainable_last_blocks must be a nonnegative integer")
+    if c["freeze_backbone"] and c["trainable_last_blocks"]:
+        raise ValueError("Cannot freeze the backbone and fine-tune its last blocks")
+    if c["head_lr_multiplier"] <= 0:
+        raise ValueError("head_lr_multiplier must be positive")
     return c
 
 def preprocess(image, size=224, augment=False):
@@ -133,11 +140,31 @@ def make_model(config, pretrained=None):
     return timm.create_model(config["model"], pretrained=config["pretrained"] if pretrained is None else pretrained,
                              num_classes=len(CLASSES), **config.get("model_kwargs", {}))
 
-def set_trainable(model, classifier_only):
+def set_trainable(model, classifier_only, last_blocks=0):
+    if last_blocks and (not hasattr(model, "blocks") or last_blocks > len(model.blocks)):
+        raise ValueError("Requested final blocks are unavailable on this model")
     for parameter in model.parameters():
         parameter.requires_grad = not classifier_only
     if classifier_only:
         model.eval()
+        classifier = model.get_classifier()
+        classifier.train()
+        for parameter in classifier.parameters():
+            parameter.requires_grad = True
+    elif last_blocks:
+        model.eval()
+        for parameter in model.parameters():
+            parameter.requires_grad = False
+        for block in model.blocks[-last_blocks:]:
+            block.train()
+            for parameter in block.parameters():
+                parameter.requires_grad = True
+        for name in ("norm", "fc_norm"):
+            layer = getattr(model, name, None)
+            if isinstance(layer, nn.Module):
+                layer.train()
+                for parameter in layer.parameters():
+                    parameter.requires_grad = True
         classifier = model.get_classifier()
         classifier.train()
         for parameter in classifier.parameters():
@@ -208,7 +235,11 @@ def train(config, dataset, split_path, output, resume=False, device_name=None, m
     train_loader = DataLoader(train_data, batch_size=config["batch_size"], shuffle=True, num_workers=config["workers"], generator=generator, worker_init_fn=seed_worker, pin_memory=device.type == "cuda")
     valid_loader = DataLoader(valid_data, batch_size=config["batch_size"], shuffle=False, num_workers=config["workers"])
     set_trainable(model, config["freeze_backbone"] or config["warmup_epochs"] > 0)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config["lr"], weight_decay=config["weight_decay"])
+    classifier_ids = {id(parameter) for parameter in model.get_classifier().parameters()}
+    optimizer = torch.optim.AdamW([
+        {"params": [parameter for parameter in model.parameters() if id(parameter) not in classifier_ids], "lr": config["lr"]},
+        {"params": list(model.get_classifier().parameters()), "lr": config["lr"] * config["head_lr_multiplier"]},
+    ], weight_decay=config["weight_decay"])
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config["epochs"], eta_min=config["lr"] * .01)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
     start_epoch, bad_epochs, history, best_key, elapsed_before = 0, 0, [], (-1., -1.), 0.
@@ -239,7 +270,7 @@ def train(config, dataset, split_path, output, resume=False, device_name=None, m
             status = "early_stopped"
             break
         classifier_only = config["freeze_backbone"] or epoch < config["warmup_epochs"]
-        set_trainable(model, classifier_only)
+        set_trainable(model, classifier_only, config["trainable_last_blocks"] if not classifier_only else 0)
         if classifier_only:
             pass  # set_trainable also freezes normalization statistics.
         else:
