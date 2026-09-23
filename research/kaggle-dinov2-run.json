@@ -1,0 +1,13 @@
+{
+  "kernel": "turki101/shuaa-dinov2-fine-tuning",
+  "url": "https://www.kaggle.com/code/turki101/shuaa-dinov2-fine-tuning",
+  "version": 1,
+  "training_source_commit": "80e8b79713ff66adf27d5281fea71825e4b1363b",
+  "status": "running",
+  "requested_accelerator": "GPU",
+  "campaign": "dinov2_finetune",
+  "campaign_budget_hours": 2.2,
+  "test_evaluated": false,
+  "collect_command": "python -X utf8 scripts/collect_kaggle.py --kernel turki101/shuaa-dinov2-fine-tuning --output outputs/kaggle-dinov2",
+  "publish_command": "python -X utf8 scripts/collect_kaggle.py --kernel turki101/shuaa-dinov2-fine-tuning --output outputs/kaggle-dinov2 --publish"
+}

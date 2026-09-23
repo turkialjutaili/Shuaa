@@ -1,6 +1,6 @@
 {
-  "id": "turki101/shuaa-dinov2-finetune",
-  "title": "Shuaa DINOv2 Fine-tuning",
+  "id": "turki101/shuaa-dinov2-fine-tuning",
+  "title": "Shuaa DINOv2 Fine Tuning",
   "code_file": "shuaa_dinov2.ipynb",
   "language": "python",
   "kernel_type": "notebook",
